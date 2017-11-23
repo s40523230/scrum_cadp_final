@@ -21,25 +21,26 @@ else:
 
  
 errorCode1,Revolute_joint_handle=vrep.simxGetObjectHandle(clientID,'Revolute_joint',vrep.simx_opmode_oneshot_wait)
-
 errorCode2,sensorHandle=vrep.simxGetObjectHandle(clientID,'Finish',vrep.simx_opmode_oneshot_wait)
 
 deg = math.pi/180
 
 count = 0
+count1 = 0
 
 if errorCode1 == -1:
     print('Can not find left or right motor')
     sys.exit()
     
 while vrep.simxGetConnectionId(clientID) != -1:
-    (errorCode3, detectionState, detectedPoint, detectedObjectHandle, detectedSurfaceNormalVector) = vrep.simxReadProximitySensor(clientID, sensorHandle, vrep.simx_opmode_streaming)
+    (errorCode3, detectionState1, detectedPoint1, detectedObjectHandle1, detectedSurfaceNormalVector1) = vrep.simxReadProximitySensor(clientID, sensorHandle, vrep.simx_opmode_streaming)
     if errorCode3 == vrep.simx_return_ok:
-        if detectionState:
+        if detectionState1:
             count += 1
             print("通過球總數:", count)
      
-    errorCode=vrep.simxSetJointTargetVelocity(clientID,Revolute_joint_handle,0.5, vrep.simx_opmode_oneshot_wait)
+     
+    errorCode4=vrep.simxSetJointTargetVelocity(clientID,Revolute_joint_handle,0.5, vrep.simx_opmode_oneshot_wait)
     
     
     '''
