@@ -28,6 +28,7 @@ class Dialog(QDialog, Ui_Dialog):
         """
         super(Dialog, self).__init__(parent)
         self.setupUi(self)
+        self.count = 0
         self.start.clicked.connect(self.start_motor)
         
     def start_motor(self):
@@ -38,7 +39,10 @@ class Dialog(QDialog, Ui_Dialog):
         vrep.simxFinish(-1)
          
         clientID = vrep.simxStart('127.0.0.1', 19997, True, True, 5000, 5)
-         
+        
+        #啟動模擬
+        vrep.simxStartSimulation(clientID, vrep.simx_opmode_oneshot)
+        
         if clientID!= -1:
             print("Connected to remote server")
         else:
@@ -46,7 +50,8 @@ class Dialog(QDialog, Ui_Dialog):
             sys.exit('Could not connect')
          
         errorCode,Revolute_joint_handle=vrep.simxGetObjectHandle(clientID,'Revolute_joint',vrep.simx_opmode_oneshot_wait)
-         
+        errorCode,  linkSensor= vrep.simxGetObjectHandle(clientID,"Proximity_sensor", vrep.simx_opmode_streaming)
+        
         if errorCode == -1:
             print('Can not find left or right motor')
             sys.exit()
@@ -54,9 +59,21 @@ class Dialog(QDialog, Ui_Dialog):
         deg = math.pi/180
          
         #errorCode=vrep.simxSetJointTargetVelocity(clientID,Revolute_joint_handle,2, vrep.simx_opmode_oneshot_wait)
-         
+        
         def setJointPosition(incAngle, steps):
             for i  in range(steps):
+                (errorCode, detectionState, detectedPoint, detectedObjectHandle, detectedSurfaceNormalVector) = vrep.simxReadProximitySensor(clientID, linkSensor, vrep.simx_opmode_streaming)
+                '''
+                if result[0] > 0:
+                    self.count += 1
+                '''
+                print("errorCode=",  errorCode)
+                print("detectionState=", detectionState)
+                print("detectObjectHandle=",  detectedObjectHandle)
+                print("detectedSurfaceNormalVector=",  detectedSurfaceNormalVector)
+                if errorCode == vrep.simx_return_ok:
+                    print(detectedObjectHandle)
+                    
                 vrep.simxSetJointPosition(clientID, Revolute_joint_handle, i*incAngle*deg, vrep.simx_opmode_oneshot_wait)
          
         # 每步 10 度, 轉兩圈
