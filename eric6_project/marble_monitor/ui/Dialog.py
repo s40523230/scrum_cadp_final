@@ -4,15 +4,15 @@
 Module implementing Dialog.
 """
 
-from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QDialog
 
 from .Ui_Dialog import Ui_Dialog
 
 # for V-rep
-
 from remoteapi import vrep
-import sys, math
+import sys
+import threading
+import time
 
 
 class Dialog(QDialog, Ui_Dialog):
@@ -29,58 +29,71 @@ class Dialog(QDialog, Ui_Dialog):
         super(Dialog, self).__init__(parent)
         self.setupUi(self)
         self.count = 0
+        self.clientID = 0
+        self.very_beginning = True
+        self.make = threading.Thread(target=self.start_thread)
+        self.pill2kill = threading.Event()
+        self.display.setText(str(self.count))
         self.start.clicked.connect(self.start_motor)
+        self.stop.clicked.connect(self.stop_motor)
+        self.pause.clicked.connect(self.pause_motor)
         
     def start_motor(self):
+        # 利用執行緒執行 start
+        if self.very_beginning:
+            self.make.start()
+            self.very_beginning = False
+        else:
+            self.pill2kill.set
+            #啟動模擬
+            vrep.simxStartSimulation(self.clientID, vrep.simx_opmode_oneshot)
+     
+    def stop_motor(self):
+        vrep.simxStopSimulation(self.clientID, vrep.simx_opmode_oneshot_wait)
+        
+    def pause_motor(self):
+        # 暫停執行緒, 暫停模擬
+        #time.sleep(2)
+        self.pill2kill.clear()
+        # 暫停模擬
+        vrep.simxPauseSimulation(self.clientID, vrep.simx_opmode_oneshot_wait)
+        
+    def start_thread(self):
         # child threaded script: 
         # 內建使用 port 19997 若要加入其他 port, 在  serve 端程式納入
         #simExtRemoteApiStart(19999)
          
         vrep.simxFinish(-1)
          
-        clientID = vrep.simxStart('127.0.0.1', 19997, True, True, 5000, 5)
+        self.clientID = vrep.simxStart('127.0.0.1', 19997, True, True, 5000, 5)
         
         #啟動模擬
-        vrep.simxStartSimulation(clientID, vrep.simx_opmode_oneshot)
+        vrep.simxStartSimulation(self.clientID, vrep.simx_opmode_oneshot)
         
-        if clientID!= -1:
+        if self.clientID!= -1:
             print("Connected to remote server")
         else:
             print('Connection not successful')
             sys.exit('Could not connect')
          
-        errorCode,Revolute_joint_handle=vrep.simxGetObjectHandle(clientID,'Revolute_joint',vrep.simx_opmode_oneshot_wait)
-        errorCode,  linkSensor= vrep.simxGetObjectHandle(clientID,"Proximity_sensor", vrep.simx_opmode_streaming)
+        errorCode1, Revolute_joint_handle = vrep.simxGetObjectHandle(self.clientID,'Revolute_joint',vrep.simx_opmode_oneshot_wait)
+        errorCode2, sensorHandle = vrep.simxGetObjectHandle(self.clientID,'Finish',vrep.simx_opmode_oneshot_wait)
         
-        if errorCode == -1:
+        if errorCode1 == -1:
             print('Can not find left or right motor')
             sys.exit()
-         
-        deg = math.pi/180
-         
-        #errorCode=vrep.simxSetJointTargetVelocity(clientID,Revolute_joint_handle,2, vrep.simx_opmode_oneshot_wait)
-        
-        def setJointPosition(incAngle, steps):
-            for i  in range(steps):
-                (errorCode, detectionState, detectedPoint, detectedObjectHandle, detectedSurfaceNormalVector) = vrep.simxReadProximitySensor(clientID, linkSensor, vrep.simx_opmode_streaming)
-                '''
-                if result[0] > 0:
+            
+        while vrep.simxGetConnectionId(self.clientID) != -1:
+            (errorCode3, detectionState1, detectedPoint1, detectedObjectHandle1, detectedSurfaceNormalVector1) = vrep.simxReadProximitySensor(self.clientID, sensorHandle, vrep.simx_opmode_streaming)
+            if errorCode3 == vrep.simx_return_ok:
+                if detectionState1:
                     self.count += 1
-                '''
-                print("errorCode=",  errorCode)
-                print("detectionState=", detectionState)
-                print("detectObjectHandle=",  detectedObjectHandle)
-                print("detectedSurfaceNormalVector=",  detectedSurfaceNormalVector)
-                if errorCode == vrep.simx_return_ok:
-                    print(detectedObjectHandle)
+                    print("通過球總數:", self.count)
                     
-                vrep.simxSetJointPosition(clientID, Revolute_joint_handle, i*incAngle*deg, vrep.simx_opmode_oneshot_wait)
-         
-        # 每步 10 度, 轉兩圈
-        setJointPosition(10, 72)
-        # 每步 1 度, 轉兩圈
-        #setJointPosition(1, 720)
-        # 每步 0.1  度, 轉720 步
-        #setJointPosition(0.1, 720)
+            self.display.setText(str(self.count))
+            vrep.simxSetJointTargetVelocity(self.clientID, Revolute_joint_handle, 0.5, vrep.simx_opmode_oneshot_wait)
+    
+        #終止模擬
+        vrep.simxStopSimulation(self.clientID, vrep.simx_opmode_oneshot_wait)
 
  
